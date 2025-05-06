@@ -1,4 +1,3 @@
-import os
 import streamlit as st
 import subprocess
 import threading
@@ -6,11 +5,11 @@ import queue
 import time
 
 # ========== Config (adjust your API key and model below) ==========
-OPENAI_KEY = os.environ['OPENAI_API_KEY']  # <-- replace with your OpenAI key
-AIDER_COMMAND = f"aider --model o3-mini --api-key openai={OPENAI_KEY} --no-auto-commits"
+OPENAI_KEY = "OPENAI_KEY"  # <-- replace with your OpenAI key
+AIDER_COMMAND = f"aider --model o3-mini --api-key openai={OPENAI_KEY}"
 
 # ========== Background Thread: Reads output from aider ==========
-def read_output(process, complete_log_queue, partial_log_queue, stop_event, complete_logs, partial_logs):
+def read_output(process, complete_log_queue, partial_log_queue, stop_event):
     partial_line = ""
     while not stop_event.is_set():
         char = process.stdout.read(1)  # Read one character at a time
@@ -22,15 +21,11 @@ def read_output(process, complete_log_queue, partial_log_queue, stop_event, comp
                 # Clear the partial log queue
                 while not partial_log_queue.empty():
                     partial_log_queue.get()
-                    
-                partial_logs.clear()
-                
             else:
                # Clear the partial log queue and update it with the current partial line
                 while not partial_log_queue.empty():
                     partial_log_queue.get()
                 partial_log_queue.put(partial_line.rstrip())
-                
         elif process.poll() is not None:  # If the process has ended
             break
 
@@ -84,14 +79,8 @@ if st.button("🚀 aider-install / Start Session", disabled=st.session_state.aid
 
         st.session_state.reader_thread = threading.Thread(
             target=read_output,
-            args=(
-                st.session_state.process,
-                st.session_state.complete_log_queue,
-                st.session_state.partial_log_queue,
-                st.session_state.stop_event,
-                st.session_state.complete_logs,
-                st.session_state.partial_logs
-            ),
+            args=(st.session_state.process, st.session_state.complete_log_queue,
+                st.session_state.partial_log_queue, st.session_state.stop_event),
             daemon=True
         )
         st.session_state.reader_thread.start()
@@ -103,18 +92,13 @@ if st.button("🚀 aider-install / Start Session", disabled=st.session_state.aid
 # while not st.session_state.log_queue.empty():
 #     st.session_state.logs.append(st.session_state.log_queue.get())
 # -- Update logs from the queues --
-def update_logs(complete_log_queue, complete_logs, partial_log_queue, partial_logs):
-    while not complete_log_queue.empty():
-        complete_logs.append(complete_log_queue.get())
-    while not partial_log_queue.empty():
-        partial_logs.append(partial_log_queue.get())
+def update_logs():
+    while not st.session_state.complete_log_queue.empty():
+        st.session_state.complete_logs.append(st.session_state.complete_log_queue.get())
+    while not st.session_state.partial_log_queue.empty():
+        st.session_state.partial_logs.append(st.session_state.partial_log_queue.get())
 
-update_logs(
-    st.session_state.complete_log_queue,
-    st.session_state.complete_logs,
-    st.session_state.partial_log_queue,
-    st.session_state.partial_logs
-)
+update_logs()
 # -- Display logs --
 st.subheader("🖥️ Complete Lines")
 st.text_area(
@@ -150,7 +134,7 @@ if st.session_state.aider_running:
 
                     # Clear the partial logs display
                     st.session_state.partial_logs.clear()
-
+                    
                     st.success("Prompt sent to Aider.")
                     st.rerun()  # to clear input
                 except Exception as e:
@@ -159,12 +143,7 @@ if st.session_state.aider_running:
                 st.warning("Type something to send.")
     with col2:
         if st.button("🔄 Refresh Logs", use_container_width=True):
-            update_logs(
-                st.session_state.complete_log_queue,
-                st.session_state.complete_logs,
-                st.session_state.partial_log_queue,
-                st.session_state.partial_logs
-            )
+            update_logs()
             st.rerun()
     with col3:
         if st.button("🛑 Stop Session", use_container_width=True):
