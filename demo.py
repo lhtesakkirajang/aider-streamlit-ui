@@ -172,14 +172,34 @@ if st.session_state.aider_running:
             st.session_state.aider_running = False
             st.success("🛑 Aider session stopped.")
 
-# Function to create a new branch
-def create_new_branch(branch_name):
-    try:
-        # Run the git command to create a new branch
-        subprocess.run(["git", "checkout", "-b", branch_name], check=True, text=True, shell=True)
-        st.success(f"✅ New branch '{branch_name}' created successfully.")
-    except subprocess.CalledProcessError as e:
-        st.error(f"❌ Failed to create branch: {e}")
+def run_git_command(cmd):
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Git error: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+def get_most_recent_branch():
+    cmd = [
+        "git",
+        "for-each-ref",
+        "--sort=-committerdate",
+        "--format=%(refname:short)",
+        "refs/heads/"
+    ]
+    branches = run_git_command(cmd).split("\n")
+    return branches[0] if branches else None
+
+def create_branch_from(base_branch, new_branch):
+    # Checkout the base branch
+    run_git_command(["git", "checkout", base_branch])
+    # Make sure it's up to date
+    run_git_command(["git", "pull", "origin", base_branch])
+    # Create and switch to the new branch
+    run_git_command(["git", "checkout", "-b", new_branch])
+    # Push the new branch to origin
+    run_git_command(["git", "push", "-u", "origin", new_branch])
+    print(f"Created and pushed new branch '{new_branch}' from '{base_branch}'")
+
 
 # Add a new button for creating a branch
 st.subheader("🔀 Git Branch Management")
@@ -187,7 +207,8 @@ new_branch_name = st.text_input("Enter new branch name:", key="new_branch_name")
 
 if st.button("🌱 Create New Branch", use_container_width=True):
     if new_branch_name.strip():
-        create_new_branch(new_branch_name.strip())
+        base_branch = get_most_recent_branch()
+        create_branch_from(base_branch, new_branch_name.strip())
     else:
         st.warning("Please enter a valid branch name.")
 
