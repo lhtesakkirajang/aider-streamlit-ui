@@ -99,9 +99,7 @@ if st.button("🚀 aider-install / Start Session", disabled=st.session_state.aid
     except Exception as e:
         st.error(f"❌ Failed to start Aider: {e}")
 
-# -- Display output logs --
-# while not st.session_state.log_queue.empty():
-#     st.session_state.logs.append(st.session_state.log_queue.get())
+
 # -- Update logs from the queues --
 def update_logs(complete_log_queue, complete_logs, partial_log_queue, partial_logs):
     while not complete_log_queue.empty():
@@ -174,6 +172,39 @@ if st.session_state.aider_running:
             st.session_state.aider_running = False
             st.success("🛑 Aider session stopped.")
 
+# Function to create a new branch
+def create_new_branch(branch_name):
+    try:
+        # Run the git command to create a new branch
+        subprocess.run(["git", "checkout", "-b", branch_name], check=True, text=True, shell=True)
+        st.success(f"✅ New branch '{branch_name}' created successfully.")
+    except subprocess.CalledProcessError as e:
+        st.error(f"❌ Failed to create branch: {e}")
+
+# Add a new button for creating a branch
+st.subheader("🔀 Git Branch Management")
+new_branch_name = st.text_input("Enter new branch name:", key="new_branch_name")
+
+if st.button("🌱 Create New Branch", use_container_width=True):
+    if new_branch_name.strip():
+        create_new_branch(new_branch_name.strip())
+    else:
+        st.warning("Please enter a valid branch name.")
+
+# Function to push changes to the remote repository
+def push_changes():
+    try:
+        # Run the git push command
+        subprocess.run(["git", "push", "--set-upstream", "origin", new_branch_name.strip()], check=True, text=True, shell=True)
+        st.success("✅ Changes pushed to the remote repository successfully.")
+    except subprocess.CalledProcessError as e:
+        st.error(f"❌ Failed to push changes: {e}")
+
+# Add a new button for pushing changes
+st.subheader("📤 Publish Changes")
+if st.button("🚀 Sync Changes / Publish", use_container_width=True):
+    push_changes()
+
 # -- Instructional flow for your case --
 with st.expander("📋 Sample Flow Steps (for testing)"):
     st.markdown("""
@@ -184,4 +215,3 @@ with st.expander("📋 Sample Flow Steps (for testing)"):
        - `conv continue` (continue the conversation multiple times)
     3. Use **Stop Session** to manually terminate (`Ctrl+C` equivalent).
     """)
-
